@@ -242,7 +242,14 @@ public class PerlinNoiseUI
         public void run()
         {
             // Keep drawing rows as long as we are not done and are still running
-            blockStride();
+            switch(distMethod){
+                case(1):
+                    rowStride();
+                case(2):
+                    blockStride();
+                default:
+                    throw new NumberFormatException(String.format("Invalid Distribution Model of %d", distMethod));
+            }
         }
         // --RowStride
         public void rowStride(){
@@ -257,6 +264,7 @@ public class PerlinNoiseUI
         }
         public void blockStride(){
             int blockSize = 10;
+
             // for (int block = threadNumber * blockSize; running && block < height; block += blockSize * numberOfThreads)
             // {
             //     System.out.println(block);
@@ -267,10 +275,13 @@ public class PerlinNoiseUI
             //         }
             //     }
             // }
-            
+
+
+            //Number of pixels per block
+            int pixPerBlock = blockSize * width;
             for(int block = threadNumber * blockSize; running && block < height; block+=blockSize * numberOfThreads){
-                
-                for(int pix = block; pix < (block * blockSize * width) + (blockSize * width) && pix < width * height; pix++){
+                //create color value for every pixel in a block
+                for(int pix = block; pix < block * pixPerBlock + pixPerBlock && pix < width * height; pix++){
                     //if(block == 1 * blockSize) System.out.println(pix);
                     int row, col;
                     row = pix / width;
