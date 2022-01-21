@@ -9,6 +9,7 @@ import java.awt.image.MemoryImageSource;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import java.util.Collections;
 
 public class PerlinNoiseUI
 {
@@ -33,10 +34,10 @@ public class PerlinNoiseUI
 
     // Maximum number of iterations before a number is declared in the Perlin set
     public static final int MAX_ITERATIONS = 100;
-
+    private static List<Integer> syncList = Collections.synchronizedList(new LinkedList<Integer>());
     // Distance from beyond which a point is not in the set
     public static final double THRESHOLD = 2.0;
-
+    
     public static void main(String[] args)
     {
         // Make sure we have the right number of arguments
@@ -95,7 +96,7 @@ public class PerlinNoiseUI
 
         }
         // Stop the clock
-        System.out.printf("Drawing %d image(s) took %f seconds\n", numberOfImages ,watch.elapsedTime());
+        System.out.printf("Model: %d\nI: %d\nN: %d\nS: %d x %d\nElapsed Time: %f seconds\n", distModel, numberOfImages,numberOfThreads, width, height ,watch.elapsedTime());
 
         // Show the image
         displayImage(imageData, width, height);
@@ -247,8 +248,10 @@ public class PerlinNoiseUI
                     rowStride();
                 case(2):
                     blockStride();
+                case(3):
+                    pixelStride();
                 default:
-                    throw new NumberFormatException(String.format("Invalid Distribution Model of %d", distMethod));
+                    //throw new NumberFormatException(String.format("Invalid Distribution Model of %d", distMethod));
             }
         }
         // --RowStride
@@ -262,6 +265,7 @@ public class PerlinNoiseUI
                 }
             }
         }
+        // --BlockStride
         public void blockStride(){
             int blockSize = 10;
 
@@ -291,6 +295,22 @@ public class PerlinNoiseUI
                     buffer[row * width + col] = perlinColor(cartesianPoint.getX(), cartesianPoint.getY());
                 }
             }
+        }
+
+        // --PixelStride
+        public void pixelStride(){
+            for(int pixel = threadNumber; running && pixel < width * height; pixel+=numberOfThreads){
+                int row, col;
+                row = pixel / width;
+                col = pixel % width;
+                
+                final Point2D.Double cartesianPoint = convertScreenToCartesian(col, row, width, height);
+                buffer[row * width + col] = perlinColor(cartesianPoint.getX(), cartesianPoint.getY());
+            }
+        }
+        // --Synchronized Row Stride
+        public void rowStrideSync(){
+            
         }
 
     }
