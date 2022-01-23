@@ -100,7 +100,7 @@ public class PerlinNoiseUI
         System.out.printf("Model: %d\nI: %d\nN: %d\nS: %d x %d\nElapsed Time: %f seconds\n", distModel, numberOfImages,numberOfThreads, width, height ,watch.elapsedTime());
         System.out.printf("%d, %f", numberOfThreads, watch.elapsedTime());
 
-        // Show the image
+        // Show the the last processed image.
         displayImage(imageData, width, height);
     }
 
@@ -179,6 +179,7 @@ public class PerlinNoiseUI
     }
 
     // Return the color a given Cartesian point should be colored. 
+    // Requires PerlinNoise.java file
     private static int perlinColor(double x, double y)
     {
         
@@ -277,37 +278,47 @@ public class PerlinNoiseUI
                     pixelToBuffer(row, column);
                 }
             }
-            //stopRunning();
+            stopRunning();
         }
         // --BlockStride
         public void blockStride(){
             //Number of pixels per block
             int pixPerBlock = blockSize * width;
             //increment to next block according to number of threads
-            for(int block = threadNumber * blockSize; running && block < height; block+=blockSize * numberOfThreads){
-                //create color value for every pixel in a block
-                for(int pix = block; pix < block * pixPerBlock + pixPerBlock && pix < width * height; pix++){
-                    //if(block == 1 * blockSize) System.out.println(pix);
-                    int row, col;
-                    row = pix / width;
-                    col = pix % width;
+            // for(int block = threadNumber * blockSize; running && block < height; block+=blockSize * numberOfThreads){
+            //     //create color value for every pixel in a block
+            //     for(int pix = block; pix < block * pixPerBlock + pixPerBlock && pix < width * height; pix++){
+            //         //if(block == 1 * blockSize) System.out.println(pix);
+            //         int row, col;
+            //         row = pix / width;
+            //         col = pix % width;
                     
-                    pixelToBuffer(row, col);
+            //         pixelToBuffer(row, col);
+            //     }
+            // }
+            for(int block = threadNumber; running && block < height / blockSize + 1; block+= numberOfThreads){
+
+                for (int row = block * blockSize;row < height && row < block * blockSize + blockSize; row++)
+                {
+                    for (int column = 0; column < width; column++)
+                    {
+                        pixelToBuffer(row, column);
+                    }
                 }
             }
-            //stopRunning();
+            stopRunning();
         }
 
         // --PixelStride
         public void pixelStride(){
+            int row, col;
             for(int pixel = threadNumber; running && pixel < width * height; pixel+=numberOfThreads){
-                int row, col;
                 row = pixel / width;
                 col = pixel % width;
                 
                 pixelToBuffer(row, col);
             }
-            //stopRunning();
+            stopRunning();
         }
         // --Synchronized Row Stride
         public void rowStrideSync(){
@@ -356,14 +367,21 @@ public class PerlinNoiseUI
                     syncList.add(1);
                 }
                 // stop running if block exceeds the number of blocks in provided height
-                if(block >= (height / blockSize)) {stopRunning(); return;}
-                for(int pix = block; pix < block * pixPerBlock + pixPerBlock && pix < sizeOfImage; pix++){
+                if(block >= ((height / blockSize) + 1)) {stopRunning(); return;}
+                // for(int pix = block; pix < block * pixPerBlock + pixPerBlock && pix < sizeOfImage; pix++){
                     
-                    int row, col;
-                    row = pix / width;
-                    col = pix % width;
+                //     int row, col;
+                //     row = pix / width;
+                //     col = pix % width;
                     
-                    pixelToBuffer(row, col);
+                //     pixelToBuffer(row, col);
+                // }
+                for (int row = block * blockSize;row < height && row < block * blockSize + blockSize; row++)
+                {
+                    for (int column = 0; column < width; column++)
+                    {
+                        pixelToBuffer(row, column);
+                    }
                 }
 
             }
