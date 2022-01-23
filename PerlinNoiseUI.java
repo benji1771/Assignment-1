@@ -23,7 +23,7 @@ public class PerlinNoiseUI
     private static final int MIN_METHOD = 1;
     private static final int MAX_METHOD = 6;
     private static final int MIN_IMAGES = 1;
-    private static final int MAX_IMAGES = 1000;
+    private static final int MAX_IMAGES = 10000;
     private static PerlinNoise noise = new PerlinNoise();
     // Cartesian values of the screen
     
@@ -31,10 +31,10 @@ public class PerlinNoiseUI
     private static final double HEIGHT = 7.0;
     private static final double CENTER_X = WIDTH/2;
     private static final double CENTER_Y = HEIGHT/2;
-
+    private static final int blockSize = 10;
     // Maximum number of iterations before a number is declared in the Perlin set
     public static final int MAX_ITERATIONS = 100;
-    private static List<Integer> syncList = Collections.synchronizedList(new LinkedList<Integer>());
+    private static List<Integer> syncList;
     // Distance from beyond which a point is not in the set
     public static final double THRESHOLD = 2.0;
     
@@ -74,6 +74,7 @@ public class PerlinNoiseUI
         for(int imNum = 0; imNum < numberOfImages; imNum++){
             // Make a threads for drawing. The values are passed to the
             // constructor but we could have made them global.
+            syncList = Collections.synchronizedList(new LinkedList<Integer>());
             final List<PerlinDrawingThread> perlinDrawingThreads = new LinkedList<>();
             for (int threadNumber = 0; threadNumber < numberOfThreads; threadNumber++)
             {
@@ -97,6 +98,7 @@ public class PerlinNoiseUI
         }
         // Stop the clock
         System.out.printf("Model: %d\nI: %d\nN: %d\nS: %d x %d\nElapsed Time: %f seconds\n", distModel, numberOfImages,numberOfThreads, width, height ,watch.elapsedTime());
+        System.out.printf("%d, %f", numberOfThreads, watch.elapsedTime());
 
         // Show the image
         displayImage(imageData, width, height);
@@ -250,39 +252,38 @@ public class PerlinNoiseUI
                     blockStride();
                 case(3):
                     pixelStride();
+                case(4):
+                    rowStrideSync();
+                case(5):
+                    pixelStrideSync();
+                case(6):
+                    blockStrideSync();
                 default:
                     //throw new NumberFormatException(String.format("Invalid Distribution Model of %d", distMethod));
             }
         }
+
+        public void pixelToBuffer(int row, int column){
+            final Point2D.Double cartesianPoint = convertScreenToCartesian(column, row, width, height);
+            buffer[row * width + column] = perlinColor(cartesianPoint.getX(), cartesianPoint.getY());
+        }
+
         // --RowStride
         public void rowStride(){
             for (int row = threadNumber; running && row < height; row += numberOfThreads)
             {
                 for (int column = 0; column < width; column++)
                 {
-                    final Point2D.Double cartesianPoint = convertScreenToCartesian(column, row, width, height);
-                    buffer[row * width + column] = perlinColor(cartesianPoint.getX(), cartesianPoint.getY());
+                    pixelToBuffer(row, column);
                 }
             }
+            //stopRunning();
         }
         // --BlockStride
         public void blockStride(){
-            int blockSize = 10;
-
-            // for (int block = threadNumber * blockSize; running && block < height; block += blockSize * numberOfThreads)
-            // {
-            //     System.out.println(block);
-            //     for (int row = block; row < height && row < block + blockSize; row++){
-            //         for(int col = 0; col < width; col++){
-            //             final Point2D.Double cartesianPoint = convertScreenToCartesian(col, row, width, height);
-            //             buffer[row * width + col] = perlinColor(cartesianPoint.getX(), cartesianPoint.getY());
-            //         }
-            //     }
-            // }
-
-
             //Number of pixels per block
             int pixPerBlock = blockSize * width;
+            //increment to next block according to number of threads
             for(int block = threadNumber * blockSize; running && block < height; block+=blockSize * numberOfThreads){
                 //create color value for every pixel in a block
                 for(int pix = block; pix < block * pixPerBlock + pixPerBlock && pix < width * height; pix++){
@@ -291,10 +292,10 @@ public class PerlinNoiseUI
                     row = pix / width;
                     col = pix % width;
                     
-                    final Point2D.Double cartesianPoint = convertScreenToCartesian(col, row, width, height);
-                    buffer[row * width + col] = perlinColor(cartesianPoint.getX(), cartesianPoint.getY());
+                    pixelToBuffer(row, col);
                 }
             }
+            //stopRunning();
         }
 
         // --PixelStride
@@ -304,13 +305,68 @@ public class PerlinNoiseUI
                 row = pixel / width;
                 col = pixel % width;
                 
-                final Point2D.Double cartesianPoint = convertScreenToCartesian(col, row, width, height);
-                buffer[row * width + col] = perlinColor(cartesianPoint.getX(), cartesianPoint.getY());
+                pixelToBuffer(row, col);
             }
+            //stopRunning();
         }
         // --Synchronized Row Stride
         public void rowStrideSync(){
-            
+
+            while(running){
+                int row;
+                synchronized(syncList){
+                    row = syncList.size();
+                    syncList.add(1);
+                }
+                //stop running thread if row exceeds height
+                if(row >= height) {stopRunning(); return;}
+                for(int col = 0; col < width; col++){
+                    pixelToBuffer(row, col);
+                }
+            }
+        }
+        // --Synchronized Pixel Stride
+        public void pixelStrideSync(){
+            //While Running
+            while(running){
+                int pixel;
+                synchronized(syncList){
+                    pixel = syncList.size();
+                    syncList.add(1);
+                }
+                //If the current pixel is greater than
+                if(pixel >= width * height) {stopRunning(); return;}
+                int row, col;
+                row = pixel / width;
+                col = pixel % width;
+                
+                
+                pixelToBuffer(row, col);
+                
+            }
+        }
+        // --Synchronized Block Stride
+        public void blockStrideSync(){
+            int pixPerBlock = blockSize * width;
+            int sizeOfImage = width * height;
+            while(running){
+                int block;
+                synchronized(syncList){
+                    block = syncList.size();
+                    syncList.add(1);
+                }
+                // stop running if block exceeds the number of blocks in provided height
+                if(block >= (height / blockSize)) {stopRunning(); return;}
+                for(int pix = block; pix < block * pixPerBlock + pixPerBlock && pix < sizeOfImage; pix++){
+                    
+                    int row, col;
+                    row = pix / width;
+                    col = pix % width;
+                    
+                    pixelToBuffer(row, col);
+                }
+
+            }
         }
 
     }
